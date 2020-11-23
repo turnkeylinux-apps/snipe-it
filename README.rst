@@ -11,7 +11,7 @@ asset management tool for a whole range of alternate scenarios, such as vehicle
 management, including maintenance scheduling.
 
 Snipe-IT provides `extensive documentation`_ online, including a thorough
-`User Manual`.
+`User Manual`_.
 
 This TurnKey appliance also includes all the standard features in
 `TurnKey Core`_, and on top of that:
