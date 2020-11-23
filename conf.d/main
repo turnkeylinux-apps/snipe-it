@@ -1,0 +1,67 @@
+#!/bin/bash -ex
+
+DB_NAME=snipeit
+DB_USER=snipeit
+DB_PASS=$(mcookie)
+
+ADMIN_USER="admin"
+ADMIN_DOMAIN="example.com"
+ADMIN_MAIL="${ADMIN_USER}%40${ADMIN_DOMAIN}" # '@' encoded = '%40'
+ADMIN_PASS=turnkey1
+ADMIN_FNAME="TurnKey"
+ADMIN_LNAME="Linux"
+
+SRC=/usr/local/src
+WEBROOT=/var/www/snipe-it
+CONF=$WEBROOT/.env
+
+LOC_SHARE=/usr/local/share
+LOC_BIN=/usr/local/bin
+
+# install Snipe-IT
+tar xf $SRC/snipe-it-*.tar.gz -C /var/www
+mv $WEBROOT* $WEBROOT
+rm -f $SRC/snipe-it-*.tar.gz
+
+service mysql start
+
+mysqladmin create $DB_NAME
+mysql --batch --execute "grant all privileges on $DB_NAME.* to $DB_USER@localhost identified by '$DB_PASS'; flush privileges;"
+
+cd $WEBROOT
+echo yes | composer install --no-dev --prefer-source
+
+[[ ! -f "$CONF" ]] && cp $CONF.example $CONF
+
+sed -i "\|APP_URL=|s|=.*|=http://localhost|" $CONF
+sed -i "\|DB_DATABASE=|s|=.*|=$DB_NAME|" $CONF
+sed -i "\|DB_USERNAME=|s|=.*|=$DB_USER|" $CONF
+sed -i "\|DB_PASSWORD=|s|=.*|=$DB_PASS|" $CONF
+sed -i "\|API_SECRET=|s|=.*|=$(mcookie)$(mcookie)|" $CONF
+sed -i "\|MAIL_DRIVER=|s|=.*|=mail|" $CONF
+sed -i "\|MAIL_HOST=|s|=.*|=localhost|" $CONF
+sed -i "\|MAIL_FROM_ADDR=|s|=.*|=$ADMIN_MAIL|" $CONF
+sed -i "\|MAIL_REPLYTO_ADDR=|s|=.*|=$ADMIN_MAIL|" $CONF
+
+php $WEBROOT/artisan config:cache
+php $WEBROOT/artisan key:generate --force
+php $WEBROOT/artisan config:clear
+
+chown -R www-data:www-data $WEBROOT
+
+a2dissite 000-default
+a2ensite snipe-it
+a2enmod rewrite
+
+service apache2 start
+
+sleep 1
+CURL="curl -c /tmp/cookie -b /tmp/cookie"
+#TOKEN=$($CURL http://localhost/setup 2>/dev/null | grep csrf-token | sed 's|^.*content="\([a-zA-Z0-9]*\)".*$|\1|')
+$CURL localhost/setup
+TOKEN=$($CURL localhost/setup/migrate 2>/dev/null | grep -m1 "<script nonce=" | sed 's|^.*<script nonce="\([a-zA-Z0-9]*\)".*$|\1|')
+$CURL localhost/setup/user \
+    --data-raw "_token=${TOKEN}&site_name=TurnKey+Snipe-IT+Asset+Management&locale=en&default_currency=USD&auto_increment_prefix=&zerofill_count=5&email_domain=${ADMIN_DOMAIN}&email_format=filastname&first_name=${ADMIN_FNAME}&last_name=${ADMIN_LNAME}&email=${ADMIN_MAIL}&username=${ADMIN_USER}&password=${ADMIN_PASS}&password_confirmation=${ADMIN_PASS}"
+
+service mysql stop
+service apache2 stop
