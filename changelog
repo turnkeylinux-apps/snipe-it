@@ -1,0 +1,14 @@
+turnkey-snipe-it-16.0 (1) turnkey; urgency=low
+
+  * Initial release includes Snipe-IT - v5.0.7; installed from tarball;
+    based on TurnKey LAMP.
+
+  * SSL/TLS cyphers to provide "Intermediate" browser/client support
+    (suitable for "General-purpose servers with a variety of clients,
+    recommended for almost all systems"). As provided by Mozilla via
+    https://ssl-config.mozilla.org/.
+
+  * Note: Please refer to turnkey-core's changelog for changes common to all
+    appliances. Here we only describe changes specific to this appliance.
+
+ -- Jeremy Davis <jeremy@turnkeylinux.org>  Mon, 23 Nov 2020 17:23:19 +1100
