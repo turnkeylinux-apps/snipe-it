@@ -30,6 +30,7 @@ mysql --batch --execute "grant all privileges on $DB_NAME.* to $DB_USER@localhos
 
 cd $WEBROOT
 echo yes | composer install --no-dev --prefer-source
+tkl-composer-squash-vendor
 
 [[ ! -f "$CONF" ]] && cp $CONF.example $CONF
 
