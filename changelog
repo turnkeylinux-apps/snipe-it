@@ -1,3 +1,12 @@
+turnkey-snipe-it-16.1 (1) turnkey; urgency=low
+
+  * Upgraded Snipe-IT: v5.1.4.
+
+  * Note: Please refer to turnkey-core's 16.1 changelog for changes common to all
+    appliances. Here we only describe changes specific to this appliance.
+
+ -- Stefan Davis <stefan@turnkeylinux.org>  Mon, 26 Apr 2021 15:54:01 +1000
+
 turnkey-snipe-it-16.0 (1) turnkey; urgency=low
 
   * Initial release includes Snipe-IT - v5.0.7; installed from tarball;
