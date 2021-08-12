@@ -1,3 +1,12 @@
+turnkey-snipe-it-16.2 (UNRELEASED) turnkey; urgency=low
+
+  * ...
+
+  * Add DOMAIN inithook - closes #1594
+    [ Stefan Davis <stefan@turnkeylinux.org> ]
+
+ -- Stefan Davis <stefan@turnkeylinux.org>  Thu, 12 Aug 2021 16:01:04 +1000
+
 turnkey-snipe-it-16.1 (1) turnkey; urgency=low
 
   * Upgraded Snipe-IT: v5.1.4.
