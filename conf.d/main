@@ -57,6 +57,7 @@ turnkey-artisan config:clear
 chown -R www-data:www-data $WEBROOT
 
 a2dissite 000-default
+a2enmod headers
 a2ensite snipe-it
 a2enmod rewrite
 
