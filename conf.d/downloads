@@ -5,7 +5,7 @@ dl() {
     cd $2; curl -L -f -O -J $PROXY $1; cd -
 }
 
-VERSION=$(gh_releases snipe/snipe-it | grep -v '^v.0' | sort -V | tail -1)
+VERSION=$(gh_releases snipe/snipe-it | grep -vE '^v.0|GM|RC' | sort -V | tail -1)
 URL="https://github.com/snipe/snipe-it/archive/${VERSION}.tar.gz"
 SRC=/usr/local/src
 
