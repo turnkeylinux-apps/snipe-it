@@ -1,8 +1,8 @@
 turnkey-snipe-it-17.0 (1) turnkey; urgency=low
 
-  * Upgraded Snipe-IT: v5.4.1
+  * Upgraded Snipe-IT: v5.4.4
 
-  * Note: Please refer to turnkey-core's 16.1 changelog for changes common to all
+  * Note: Please refer to turnkey-core's 17.0 changelog for changes common to all
 
  -- Zhenya Hvorostian <zhenya@turnkeylinux.org>  Fri, 06 May 2022 18:17:30 +0300
 
