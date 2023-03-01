@@ -4,7 +4,7 @@
 python3-bcrypt
 
 php8.1-curl
-php8.1-json
+//php8.1-json # in php8.1 this is a virtual package
 php8.1-mbstring
 php8.1-gd
 php8.1-ldap
