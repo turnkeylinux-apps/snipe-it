@@ -1,2 +1,2 @@
 # Snipe IT cron job to run any scheduled tasks every minute
-* * * * * /usr/bin/php /var/www/snipe-it/artisan schedule:run >> /dev/null 2>&1
+* * * * * root /usr/local/bin/turnkey-artisan schedule:run >> /dev/null 2>&1
