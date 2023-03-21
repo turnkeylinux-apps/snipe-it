@@ -54,6 +54,7 @@ turnkey-artisan config:cache
 turnkey-artisan key:generate --force
 turnkey-artisan config:clear
 
+touch $WEBROOT/storage/logs/laravel.log
 chown -R www-data:www-data $WEBROOT
 
 a2dissite 000-default

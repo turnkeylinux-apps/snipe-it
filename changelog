@@ -1,3 +1,13 @@
+turnkey-snipe-it-17.3 (1) turnkey; urgency=low
+
+  * fix (#1815) 500 error (related to #1817)
+
+  * fix (#1816) incorrect cron job
+
+  * fix (#1817) artisan run as root
+
+ -- Stefan Davis <stefan@turnkeylinux.org>  Thu, 16 Mar 2023 01:35:11 +0000
+
 turnkey-snipe-it-17.2 (1) turnkey; urgency=low
 
   * Upgraded Snipe-IT: v6.0.14.
