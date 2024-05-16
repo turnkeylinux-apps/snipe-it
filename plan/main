@@ -11,5 +11,7 @@ php8.1-ldap
 php8.1-zip
 php8.1-bcmath
 php8.1-xml
+php8.1-intl
+composer
 
 unzip
