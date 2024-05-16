@@ -11,17 +11,10 @@ ADMIN_PASS=turnkey1
 ADMIN_FNAME="TurnKey"
 ADMIN_LNAME="Linux"
 
-SRC=/usr/local/src
 WEBROOT=/var/www/snipe-it
 CONF=$WEBROOT/.env
 
-LOC_SHARE=/usr/local/share
-LOC_BIN=/usr/local/bin
-
-# install Snipe-IT
-tar xf $SRC/snipe-it-*.tar.gz -C /var/www
-mv $WEBROOT* $WEBROOT
-rm -f $SRC/snipe-it-*.tar.gz
+git clone https://github.com/snipe/snipe-it "$WEBROOT"
 
 service mysql start
 
@@ -30,7 +23,7 @@ mysql --batch --execute "grant all privileges on $DB_NAME.* to $DB_USER@localhos
 
 cd $WEBROOT
 chown -R www-data:www-data $WEBROOT
-echo yes | turnkey-composer install --no-dev --prefer-source
+turnkey-composer install --no-dev --prefer-source
 tkl-composer-squash-vendor
 
 [[ ! -f "$CONF" ]] && cp $CONF.example $CONF
