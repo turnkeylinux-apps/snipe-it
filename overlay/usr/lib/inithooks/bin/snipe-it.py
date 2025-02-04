@@ -10,6 +10,7 @@ import sys
 import getopt
 import bcrypt
 from mysqlconf import MySQL
+import subprocess
 
 from libinithooks.dialog_wrapper import Dialog
 from libinithooks import inithooks_cache
@@ -73,6 +74,11 @@ def main():
     if domain == "DEFAULT":
         domain = DEFAULT_DOMAIN
 
+    if domain.startswith('https://') or domain.startswith('http://'):
+        domain = domain.split('://', 1)[1]
+    if domain.endswith('/'):
+        domain = domain.rstrip('/')
+
     inithooks_cache.write('APP_DOMAIN', domain)
 
     CONF = '/var/www/snipe-it/.env'
@@ -87,12 +93,14 @@ def main():
             continue
         key, value = line.split('=', 1)
         if key == 'APP_URL':
-            line = f'APP_URL={domain}'
+            line = f'APP_URL=https://{domain}'
         conf_lines[i] = line + '\n'
 
     # write .env lines
     with open(CONF, 'w') as fob:
         fob.writelines(conf_lines)
+
+    subprocess.run(['/usr/local/bin/turnkey-artisan', 'config:clear'])
 
     salt = bcrypt.gensalt()
     hashpass = bcrypt.hashpw(password.encode('utf8'), salt).decode('utf8')
