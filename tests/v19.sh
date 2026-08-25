@@ -223,13 +223,24 @@ supervisorctl status snipe-it-worker >"$page"
 grep -Eq '^snipe-it-worker[[:space:]]+RUNNING' "$page"
 queue_name="turnkey-v19-probe-$$"
 queue_payload="turnkey-v19-queue-$$"
-runuser -u www-data -- php "$webroot/artisan" tinker --execute="\
-Illuminate\\Support\\Facades\\Queue::connection('redis')->pushRaw('$queue_payload', '$queue_name');" \
-    >/dev/null
-runuser -u www-data -- php "$webroot/artisan" tinker --execute="\
-\$job=Illuminate\\Support\\Facades\\Queue::connection('redis')->pop('$queue_name'); \
-file_put_contents('$queue_probe', \$job->getRawBody()); \$job->delete();" \
-    >/dev/null
+runuser -u www-data -- php -r '
+    require $argv[1] . "/vendor/autoload.php";
+    $app = require $argv[1] . "/bootstrap/app.php";
+    $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+    Illuminate\Support\Facades\Queue::connection("redis")
+        ->pushRaw($argv[2], $argv[3]);
+' "$webroot" "$queue_payload" "$queue_name"
+runuser -u www-data -- php -r '
+    require $argv[1] . "/vendor/autoload.php";
+    $app = require $argv[1] . "/bootstrap/app.php";
+    $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+    $job = Illuminate\Support\Facades\Queue::connection("redis")->pop($argv[2]);
+    if (!$job) {
+        exit(2);
+    }
+    file_put_contents($argv[3], $job->getRawBody());
+    $job->delete();
+' "$webroot" "$queue_name" "$queue_probe"
 grep -Fxq "$queue_payload" "$queue_probe"
 
 grep -Fxq '* * * * * www-data /usr/bin/php /var/www/snipe-it/artisan schedule:run > /dev/null 2>&1' \
@@ -242,9 +253,15 @@ runuser -u www-data -- php "$webroot/artisan" schedule:run \
     --no-interaction >/dev/null
 
 mail_marker="TurnKey v19 Snipe-IT mail $$"
-runuser -u www-data -- php "$webroot/artisan" tinker --execute="\
-Illuminate\\Support\\Facades\\Mail::raw('$mail_marker', function (\$message) { \
-\$message->to('root@localhost')->subject('$mail_marker'); });" >/dev/null
+runuser -u www-data -- php -r '
+    require $argv[1] . "/vendor/autoload.php";
+    $app = require $argv[1] . "/bootstrap/app.php";
+    $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+    $marker = $argv[2];
+    Illuminate\Support\Facades\Mail::raw($marker, function ($message) use ($marker) {
+        $message->to("root@localhost")->subject($marker);
+    });
+' "$webroot" "$mail_marker"
 for _ in $(seq 1 20); do
     grep -Fq "$mail_marker" /var/mail/root 2>/dev/null && break
     sleep 1
