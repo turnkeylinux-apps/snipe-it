@@ -67,9 +67,26 @@ print(data["payload"]["id"])
 PYTHON
 }
 
+require_active_unit() {
+    local unit=$1
+    local state=
+
+    for _ in {1..10}; do
+        state=$(systemctl is-active "$unit" 2>/dev/null || true)
+        if [[ $state == active ]]; then
+            return 0
+        fi
+        sleep 1
+    done
+
+    printf 'required_unit_inactive unit=%s state=%s\n' "$unit" "$state" >&2
+    systemctl --no-pager --full status "$unit" >&2 || true
+    return 1
+}
+
 for unit in apache2.service mariadb.service redis-server.service \
         supervisor.service postfix.service cron.service multi-user.target; do
-    systemctl --quiet is-active "$unit"
+    require_active_unit "$unit"
 done
 for unit in apache2.service mariadb.service redis-server.service \
         supervisor.service postfix.service cron.service; do
