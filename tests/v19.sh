@@ -227,8 +227,16 @@ runuser -u www-data -- php -r '
     require $argv[1] . "/vendor/autoload.php";
     $app = require $argv[1] . "/bootstrap/app.php";
     $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-    Illuminate\Support\Facades\Queue::connection("redis")
-        ->pushRaw($argv[2], $argv[3]);
+    $queue = Illuminate\Support\Facades\Queue::connection("redis");
+    $payload = json_encode([
+        "id" => $argv[2],
+        "attempts" => 0,
+        "data" => ["marker" => $argv[2]],
+    ], JSON_THROW_ON_ERROR);
+    $queue->pushRaw($payload, $argv[3]);
+    if ($queue->size($argv[3]) !== 1) {
+        exit(3);
+    }
 ' "$webroot" "$queue_payload" "$queue_name"
 runuser -u www-data -- php -r '
     require $argv[1] . "/vendor/autoload.php";
@@ -238,7 +246,8 @@ runuser -u www-data -- php -r '
     if (!$job) {
         exit(2);
     }
-    file_put_contents($argv[3], $job->getRawBody());
+    $payload = json_decode($job->getRawBody(), true, flags: JSON_THROW_ON_ERROR);
+    file_put_contents($argv[3], $payload["data"]["marker"]);
     $job->delete();
 ' "$webroot" "$queue_name" "$queue_probe"
 grep -Fxq "$queue_payload" "$queue_probe"
