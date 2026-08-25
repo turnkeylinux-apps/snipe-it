@@ -299,8 +299,13 @@ curl --insecure --fail --silent --show-error --head \
 
 update_result=$(turnkey-snipe-it-update --check)
 grep -Fq "installed=$installed_version" <<<"$update_result"
-grep -Fq 'latest=v8.6.3' <<<"$update_result"
 grep -Fq 'channel=official-stable' <<<"$update_result"
+latest_tag=$(grep -oE 'latest=v[0-9]+\.[0-9]+\.[0-9]+' <<<"$update_result" |
+    cut -d= -f2)
+latest_commit=$(grep -oE 'candidate=[0-9a-f]{40}' <<<"$update_result" |
+    cut -d= -f2)
+test -n "$latest_tag"
+test -n "$latest_commit"
 
 apache_version=$(dpkg-query -W -f='${Version}' apache2)
 mariadb_version=$(dpkg-query -W -f='${Version}' mariadb-server)
@@ -326,7 +331,7 @@ package_source=Official Snipe-IT v8.6.3 Git release at commit cfd1ff8413e478a8da
 installed_version=Snipe-IT $installed_version; PHP $php_version; apache2 $apache_version; mariadb-server $mariadb_version; redis-server $redis_version
 runtime_checks=normal init; Apache TLS; firstboot administrator HTTPS login; Snipe-IT API asset create and read with direct MariaDB readback after service restart; Redis queue round trip and supervised worker; Laravel scheduler; application mail through local Postfix; authenticated Adminer and Webmin endpoints
 updater_command=turnkey-snipe-it-update --check; apt-get update and apt-cache policy
-updater_result=official stable Snipe-IT release v8.6.3 and its Git tag commit were identified with installed source unchanged; signed Trixie metadata refreshed with installed packages unchanged
+updater_result=installed Snipe-IT v8.6.3 source remained unchanged; current official stable release $latest_tag and candidate commit $latest_commit were identified; signed Trixie metadata refreshed with installed packages unchanged
 updater_channel=official Snipe-IT stable releases and master through https://github.com/grokability/snipe-it; signed Debian and TurnKey Trixie repositories
 integrity_evidence=installed official Git commit cfd1ff8413e478a8daab700c15e96c96f93220e2 and tree 012c6af2f4b2428d4c057b9861a7ab71f2a87e14 passed git fsck and matched the release marker; APT accepted signed Trixie metadata; no Bookworm source remained
 EOF
