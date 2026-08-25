@@ -1,8 +1,9 @@
-#!/bin/bash -ex
+#!/bin/bash -e
+
+set -x
 
 DB_NAME=snipeit
 DB_USER=snipeit
-DB_PASS=$(mcookie)
 
 ADMIN_USER="admin"
 ADMIN_DOMAIN="example.com"
@@ -17,6 +18,9 @@ CONF=$WEBROOT/.env
 service mysql start
 
 mysqladmin create $DB_NAME
+
+set +x
+DB_PASS=$(mcookie)
 mysql --batch <<EOF
 CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
 GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
@@ -39,6 +43,8 @@ sed -i "\|QUEUE_CONNECTION=|s|=.*|=redis|" $CONF
 sed -i "\|REDIS_HOST=|s|=.*|=127.0.0.1|" $CONF
 sed -i "\|REDIS_PASSWORD=|s|=.*|=null|" $CONF
 sed -i "\|REDIS_PORT=|s|=.*|=6379|" $CONF
+unset DB_PASS
+set -x
 
 # Ensure that turnkey-artisan knows where webroot is
 sed -i "\|^export WEBROOT| s|=.*|="$WEBROOT"|" /usr/local/bin/turnkey-artisan

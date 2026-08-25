@@ -306,6 +306,16 @@ latest_commit=$(grep -oE 'candidate=[0-9a-f]{40}' <<<"$update_result" |
     cut -d= -f2)
 test -n "$latest_tag"
 test -n "$latest_commit"
+apply_plan=$(turnkey-snipe-it-update --apply --dry-run)
+grep -Fq 'mode=apply-dry-run' <<<"$apply_plan"
+grep -Fq "target=$latest_tag" <<<"$apply_plan"
+grep -Fq "candidate=$latest_commit" <<<"$apply_plan"
+grep -Fq "branch=$latest_tag" <<<"$apply_plan"
+grep -Fq 'verified=official-stable-tag' <<<"$apply_plan"
+if grep -Eq '(^|[[:space:]])(target|branch)=master([[:space:]]|$)' \
+        <<<"$apply_plan"; then
+    exit 1
+fi
 
 apache_version=$(dpkg-query -W -f='${Version}' apache2)
 mariadb_version=$(dpkg-query -W -f='${Version}' mariadb-server)
@@ -330,8 +340,8 @@ cat >"$result" <<EOF
 package_source=Official Snipe-IT v8.6.3 Git release at commit cfd1ff8413e478a8daab700c15e96c96f93220e2; PHP, Apache, MariaDB, Redis, Composer, Postfix and supporting extensions from Debian Trixie
 installed_version=Snipe-IT $installed_version; PHP $php_version; apache2 $apache_version; mariadb-server $mariadb_version; redis-server $redis_version
 runtime_checks=normal init; Apache TLS; firstboot administrator HTTPS login; Snipe-IT API asset create and read with direct MariaDB readback after service restart; Redis queue round trip and supervised worker; Laravel scheduler; application mail through local Postfix; authenticated Adminer and Webmin endpoints
-updater_command=turnkey-snipe-it-update --check; apt-get update and apt-cache policy
-updater_result=installed Snipe-IT v8.6.3 source remained unchanged; current official stable release $latest_tag and candidate commit $latest_commit were identified; signed Trixie metadata refreshed with installed packages unchanged
-updater_channel=official Snipe-IT stable releases and master through https://github.com/grokability/snipe-it; signed Debian and TurnKey Trixie repositories
+updater_command=turnkey-snipe-it-update --check; turnkey-snipe-it-update --apply --dry-run; apt-get update and apt-cache policy
+updater_result=installed Snipe-IT v8.6.3 source remained unchanged; current official stable release $latest_tag and candidate commit $latest_commit were identified; apply selected and verified that exact tag and commit instead of master; signed Trixie metadata refreshed with installed packages unchanged
+updater_channel=official Snipe-IT stable release tags through https://github.com/grokability/snipe-it; signed Debian and TurnKey Trixie repositories
 integrity_evidence=installed official Git commit cfd1ff8413e478a8daab700c15e96c96f93220e2 and tree 012c6af2f4b2428d4c057b9861a7ab71f2a87e14 passed git fsck and matched the release marker; APT accepted signed Trixie metadata; no Bookworm source remained
 EOF
