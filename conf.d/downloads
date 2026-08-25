@@ -1,0 +1,31 @@
+#!/bin/bash -ex
+
+VERSION=8.6.3
+TAG=v8.6.3
+COMMIT=cfd1ff8413e478a8daab700c15e96c96f93220e2
+TREE=012c6af2f4b2428d4c057b9861a7ab71f2a87e14
+URL=https://github.com/grokability/snipe-it.git
+WEBROOT=/var/www/snipe-it
+
+[[ -z ${FAB_HTTP_PROXY:-} ]] || export http_proxy=$FAB_HTTP_PROXY
+[[ -z ${FAB_HTTPS_PROXY:-} ]] || export https_proxy=$FAB_HTTPS_PROXY
+
+git init "$WEBROOT"
+git -C "$WEBROOT" remote add origin "$URL"
+git -C "$WEBROOT" fetch --depth 1 origin "$COMMIT"
+git -C "$WEBROOT" checkout -b master FETCH_HEAD
+git -C "$WEBROOT" config branch.master.remote origin
+git -C "$WEBROOT" config branch.master.merge refs/heads/master
+
+test "$(git -C "$WEBROOT" rev-parse HEAD)" = "$COMMIT"
+test "$(git -C "$WEBROOT" rev-parse 'HEAD^{tree}')" = "$TREE"
+git -C "$WEBROOT" fsck --no-dangling
+
+install -d -m 0755 /usr/local/share/turnkey
+cat >/usr/local/share/turnkey/snipe-it-source <<EOF
+version=$VERSION
+tag=$TAG
+commit=$COMMIT
+tree=$TREE
+url=$URL
+EOF

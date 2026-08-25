@@ -1,0 +1,52 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+WEBROOT=/var/www/snipe-it
+SOURCE=/usr/local/share/turnkey/snipe-it-source
+REMOTE=https://github.com/grokability/snipe-it.git
+
+usage() {
+    echo "Usage: $(basename "$0") --check|--apply" >&2
+    exit 1
+}
+
+[[ $# -eq 1 ]] || usage
+# shellcheck disable=SC1090
+. "$SOURCE"
+
+case $1 in
+    --check)
+        git_safe=(git -c safe.directory="$WEBROOT" -C "$WEBROOT")
+        installed_commit=$("${git_safe[@]}" rev-parse HEAD)
+        installed_tree=$("${git_safe[@]}" rev-parse 'HEAD^{tree}')
+        test "$installed_commit" = "$commit"
+        test "$installed_tree" = "$tree"
+        test "$("${git_safe[@]}" remote get-url origin)" = "$REMOTE"
+        "${git_safe[@]}" diff --quiet
+        "${git_safe[@]}" fetch --dry-run --quiet origin master
+
+        release=$(curl --fail --silent --show-error \
+            https://api.github.com/repos/grokability/snipe-it/releases/latest)
+        latest_tag=$(python3 -c \
+            'import json,sys; print(json.load(sys.stdin)["tag_name"])' \
+            <<<"$release")
+        test -n "$latest_tag"
+        latest_refs=$(git ls-remote "$REMOTE" \
+            "refs/tags/$latest_tag" "refs/tags/$latest_tag^{}")
+        latest_commit=$(awk '$2 ~ /\^\{\}$/ { print $1; found=1 }
+            !found && NR == 1 { first=$1 }
+            END { if (!found) print first }' <<<"$latest_refs")
+        test -n "$latest_commit"
+        "${git_safe[@]}" diff --quiet
+
+        echo "installed=$version commit=$installed_commit latest=$latest_tag candidate=$latest_commit channel=official-stable"
+        ;;
+    --apply)
+        test "$(id -u)" -eq 0
+        exec runuser -u www-data -- bash -c \
+            'cd /var/www/snipe-it && exec php upgrade.php --no-interactive'
+        ;;
+    *)
+        usage
+        ;;
+esac

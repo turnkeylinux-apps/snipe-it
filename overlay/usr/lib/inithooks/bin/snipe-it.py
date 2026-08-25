@@ -23,7 +23,9 @@ def usage(s=None):
     print(__doc__, file=sys.stderr)
     sys.exit(1)
 
-DEFAULT_DOMAIN="www.example.com"
+
+DEFAULT_DOMAIN = "www.example.com"
+
 
 def main():
     try:
@@ -86,28 +88,35 @@ def main():
     with open(CONF, 'r') as fob:
         conf_lines = fob.readlines()
 
-    # find APP_URL and set it to domain
+    replacements = {
+        'APP_URL': f'https://{domain}',
+        'MAIL_FROM_ADDR': email,
+        'MAIL_REPLYTO_ADDR': email,
+    }
     for i in range(len(conf_lines)):
         line = conf_lines[i].strip()
         if '=' not in line:
             continue
         key, value = line.split('=', 1)
-        if key == 'APP_URL':
-            line = f'APP_URL=https://{domain}'
+        if key in replacements:
+            line = f'{key}={replacements[key]}'
         conf_lines[i] = line + '\n'
 
     # write .env lines
     with open(CONF, 'w') as fob:
         fob.writelines(conf_lines)
 
-    subprocess.run(['/usr/local/bin/turnkey-artisan', 'config:clear'])
+    subprocess.run(
+        ['/usr/local/bin/turnkey-artisan', 'config:clear'], check=True)
 
     salt = bcrypt.gensalt()
     hashpass = bcrypt.hashpw(password.encode('utf8'), salt).decode('utf8')
-    
+
     m = MySQL()
     m.execute('UPDATE snipeit.users SET password=%s WHERE id=1;', (hashpass,))
     m.execute('UPDATE snipeit.users SET email=%s WHERE id=1;', (email,))
+    m.execute('UPDATE snipeit.settings SET alert_email=%s WHERE id=1;',
+              (email,))
 
 
 if __name__ == "__main__":
