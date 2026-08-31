@@ -1,12 +1,13 @@
-#!/bin/bash -ex
+#!/bin/bash -e
+
+set -x
 
 DB_NAME=snipeit
 DB_USER=snipeit
-DB_PASS=$(mcookie)
 
 ADMIN_USER="admin"
 ADMIN_DOMAIN="example.com"
-ADMIN_MAIL="${ADMIN_USER}%40${ADMIN_DOMAIN}" # '@' encoded = '%40'
+ADMIN_MAIL="${ADMIN_USER}@${ADMIN_DOMAIN}"
 ADMIN_PASS=turnkey1
 ADMIN_FNAME="TurnKey"
 ADMIN_LNAME="Linux"
@@ -14,17 +15,20 @@ ADMIN_LNAME="Linux"
 WEBROOT=/var/www/snipe-it
 CONF=$WEBROOT/.env
 
-git clone https://github.com/snipe/snipe-it "$WEBROOT"
-
 service mysql start
 
 mysqladmin create $DB_NAME
-mysql --batch --execute "grant all privileges on $DB_NAME.* to $DB_USER@localhost identified by '$DB_PASS'; flush privileges;"
+
+set +x
+DB_PASS=$(mcookie)
+mysql --batch <<EOF
+CREATE USER '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
+GRANT ALL PRIVILEGES ON $DB_NAME.* TO '$DB_USER'@'localhost';
+FLUSH PRIVILEGES;
+EOF
 
 cd $WEBROOT
 chown -R www-data:www-data $WEBROOT
-turnkey-composer install --no-dev --prefer-source
-tkl-composer-squash-vendor
 
 [[ ! -f "$CONF" ]] && cp $CONF.example $CONF
 
@@ -32,18 +36,23 @@ sed -i "\|APP_URL=|s|=.*|=http://localhost|" $CONF
 sed -i "\|DB_DATABASE=|s|=.*|=$DB_NAME|" $CONF
 sed -i "\|DB_USERNAME=|s|=.*|=$DB_USER|" $CONF
 sed -i "\|DB_PASSWORD=|s|=.*|=$DB_PASS|" $CONF
-sed -i "\|API_SECRET=|s|=.*|=$(mcookie)$(mcookie)|" $CONF
-sed -i "\|MAIL_DRIVER=|s|=.*|=mail|" $CONF
-sed -i "\|MAIL_HOST=|s|=.*|=localhost|" $CONF
+sed -i "\|MAIL_MAILER=|s|=.*|=sendmail|" $CONF
 sed -i "\|MAIL_FROM_ADDR=|s|=.*|=$ADMIN_MAIL|" $CONF
 sed -i "\|MAIL_REPLYTO_ADDR=|s|=.*|=$ADMIN_MAIL|" $CONF
+sed -i "\|QUEUE_CONNECTION=|s|=.*|=redis|" $CONF
+sed -i "\|REDIS_HOST=|s|=.*|=127.0.0.1|" $CONF
+sed -i "\|REDIS_PASSWORD=|s|=.*|=null|" $CONF
+sed -i "\|REDIS_PORT=|s|=.*|=6379|" $CONF
+unset DB_PASS
+set -x
 
 # Ensure that turnkey-artisan knows where webroot is
 sed -i "\|^export WEBROOT| s|=.*|="$WEBROOT"|" /usr/local/bin/turnkey-artisan
 
 chown -R www-data:www-data $WEBROOT
 
-turnkey-artisan config:cache
+turnkey-composer install --no-dev --prefer-dist --no-interaction \
+    --no-progress --optimize-autoloader
 turnkey-artisan key:generate --force
 turnkey-artisan config:clear
 
@@ -56,14 +65,54 @@ a2ensite snipe-it
 a2enmod rewrite
 
 service apache2 start
+service redis-server start
 
-sleep 1
-CURL="curl -c /tmp/cookie -b /tmp/cookie"
-#TOKEN=$($CURL http://localhost/setup 2>/dev/null | grep csrf-token | sed 's|^.*content="\([a-zA-Z0-9]*\)".*$|\1|')
-$CURL localhost/setup
-TOKEN=$($CURL localhost/setup/migrate 2>/dev/null | grep -m1 "<script nonce=" | sed 's|^.*<script nonce="\([a-zA-Z0-9]*\)".*$|\1|')
-$CURL localhost/setup/user \
-    --data-raw "_token=${TOKEN}&site_name=TurnKey+Snipe-IT+Asset+Management&locale=en&default_currency=USD&auto_increment_prefix=&zerofill_count=5&email_domain=${ADMIN_DOMAIN}&email_format=filastname&first_name=${ADMIN_FNAME}&last_name=${ADMIN_LNAME}&email=${ADMIN_MAIL}&username=${ADMIN_USER}&password=${ADMIN_PASS}&password_confirmation=${ADMIN_PASS}"
+COOKIE=/tmp/snipe-it-setup-cookie
+PAGE=/tmp/snipe-it-setup-page
+HEADERS=/tmp/snipe-it-setup-headers
+
+for _ in $(seq 1 30); do
+    if curl --fail --silent --show-error --cookie-jar "$COOKIE" \
+            http://localhost/setup >"$PAGE"; then
+        break
+    fi
+    sleep 1
+done
+grep -Fqi 'Create database tables' "$PAGE"
+TOKEN=$(sed -n 's/.*name="_token" value="\([^"]*\)".*/\1/p' "$PAGE" |
+    head -n1)
+test -n "$TOKEN"
+curl --fail --silent --show-error --cookie "$COOKIE" --cookie-jar "$COOKIE" \
+    --data-urlencode "_token=$TOKEN" http://localhost/setup/migrate >"$PAGE"
+grep -Fqi 'Database Migrations' "$PAGE"
+
+curl --fail --silent --show-error --cookie "$COOKIE" --cookie-jar "$COOKIE" \
+    http://localhost/setup/user >"$PAGE"
+TOKEN=$(sed -n 's/.*name="_token" value="\([^"]*\)".*/\1/p' "$PAGE" |
+    head -n1)
+test -n "$TOKEN"
+curl --silent --show-error --cookie "$COOKIE" --cookie-jar "$COOKIE" \
+    --data-urlencode "_token=$TOKEN" \
+    --data-urlencode 'site_name=TurnKey Snipe-IT Asset Management' \
+    --data-urlencode 'locale=en-US' \
+    --data-urlencode 'default_currency=USD' \
+    --data-urlencode 'auto_increment_prefix=' \
+    --data-urlencode 'zerofill_count=5' \
+    --data-urlencode "email_domain=$ADMIN_DOMAIN" \
+    --data-urlencode 'email_format=filastname' \
+    --data-urlencode "first_name=$ADMIN_FNAME" \
+    --data-urlencode "last_name=$ADMIN_LNAME" \
+    --data-urlencode "email=$ADMIN_MAIL" \
+    --data-urlencode "username=$ADMIN_USER" \
+    --data-urlencode "password=$ADMIN_PASS" \
+    --data-urlencode "password_confirmation=$ADMIN_PASS" \
+    --dump-header "$HEADERS" --output "$PAGE" \
+    http://localhost/setup/user
+grep -Eq '^HTTP/.* 30[12378]' "$HEADERS"
+grep -Eqi '^Location: .*/setup/done' "$HEADERS"
+
+rm -f "$COOKIE" "$PAGE" "$HEADERS"
 
 service mysql stop
 service apache2 stop
+service redis-server stop

@@ -1,3 +1,17 @@
+turnkey-snipe-it-19.0 (1) turnkey; urgency=low
+
+  * Install the official Snipe-IT 8.6.3 release from its pinned Git commit.
+
+  * Upgrade the base distribution to Debian 13/Trixie with PHP 8.4,
+    MariaDB, Redis, Composer and supporting packages from signed repositories.
+
+  * Add Redis queue supervision, scheduled maintenance and a supervised
+    official update command that binds upgrades to a verified stable tag.
+
+  * Keep generated database credentials out of build tracing.
+
+ -- TurnKey Linux release engineering <release@turnkeylinux.org>  Tue, 25 Aug 2026 00:00:00 +0000
+
 turnkey-snipe-it-18.0 (1) turnkey; urgency=low
 
   * Snipe-IT now installed from git master as-per upstream recommendations

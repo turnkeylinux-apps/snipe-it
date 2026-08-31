@@ -1,0 +1,100 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+WEBROOT=/var/www/snipe-it
+SOURCE=/usr/local/share/turnkey/snipe-it-source
+REMOTE=https://github.com/grokability/snipe-it.git
+
+usage() {
+    echo "Usage: $(basename "$0") --check|--apply [--dry-run]" >&2
+    exit 1
+}
+
+if [[ $# -ne 1 && ! ($# -eq 2 && $1 == --apply && $2 == --dry-run) ]]; then
+    usage
+fi
+# shellcheck disable=SC1090
+. "$SOURCE"
+
+git_safe=(git -c safe.directory="$WEBROOT" -C "$WEBROOT")
+
+validate_installation() {
+    installed_commit=$("${git_safe[@]}" rev-parse HEAD)
+    installed_tree=$("${git_safe[@]}" rev-parse 'HEAD^{tree}')
+    test "$installed_commit" = "$commit"
+    test "$installed_tree" = "$tree"
+    test "$("${git_safe[@]}" remote get-url origin)" = "$REMOTE"
+    "${git_safe[@]}" diff --quiet
+    "${git_safe[@]}" diff --cached --quiet
+}
+
+discover_stable() {
+    local release stable_refs tag_ref peeled_ref tag_object peeled_commit
+
+    release=$(curl --fail --silent --show-error \
+        https://api.github.com/repos/grokability/snipe-it/releases/latest)
+    stable_tag=$(python3 -c \
+        'import json,sys; print(json.load(sys.stdin)["tag_name"])' \
+        <<<"$release")
+    [[ $stable_tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+
+    tag_ref="refs/tags/$stable_tag"
+    peeled_ref="$tag_ref^{}"
+    stable_refs=$(git ls-remote "$REMOTE" "$tag_ref" "$peeled_ref")
+    tag_object=$(awk -v ref="$tag_ref" '$2 == ref { print $1 }' \
+        <<<"$stable_refs")
+    peeled_commit=$(awk -v ref="$peeled_ref" '$2 == ref { print $1 }' \
+        <<<"$stable_refs")
+    test -n "$tag_object"
+    stable_commit=${peeled_commit:-$tag_object}
+    [[ $stable_commit =~ ^[0-9a-f]{40}$ ]]
+}
+
+validate_installation
+discover_stable
+
+case $1 in
+    --check)
+        echo "installed=$version commit=$installed_commit latest=$stable_tag candidate=$stable_commit channel=official-stable"
+        ;;
+    --apply)
+        test "$(id -u)" -eq 0
+        if [[ ${2:-} == --dry-run ]]; then
+            echo "mode=apply-dry-run target=$stable_tag candidate=$stable_commit branch=$stable_tag verified=official-stable-tag"
+            exit 0
+        fi
+
+        target_ref="refs/tags/$stable_tag"
+        runuser -u www-data -- git -C "$WEBROOT" fetch --force --depth 1 \
+            origin "$target_ref:$target_ref"
+        fetched_commit=$("${git_safe[@]}" rev-parse "$target_ref^{commit}")
+        test "$fetched_commit" = "$stable_commit"
+
+        runuser -u www-data -- bash -c \
+            'cd "$1" && exec php upgrade.php --no-interactive --branch "$2"' \
+            -- "$WEBROOT" "$stable_tag"
+
+        updated_commit=$("${git_safe[@]}" rev-parse HEAD)
+        updated_tree=$("${git_safe[@]}" rev-parse 'HEAD^{tree}')
+        test "$updated_commit" = "$stable_commit"
+        "${git_safe[@]}" diff --quiet
+        "${git_safe[@]}" diff --cached --quiet
+
+        updated_version=${stable_tag#v}
+        source_tmp=$(mktemp "$SOURCE.XXXXXX")
+        {
+            printf 'version=%s\n' "$updated_version"
+            printf 'tag=%s\n' "$stable_tag"
+            printf 'commit=%s\n' "$updated_commit"
+            printf 'tree=%s\n' "$updated_tree"
+            printf 'url=%s\n' "$REMOTE"
+        } >"$source_tmp"
+        chmod 0644 "$source_tmp"
+        mv "$source_tmp" "$SOURCE"
+
+        echo "updated=$updated_version tag=$stable_tag commit=$updated_commit tree=$updated_tree channel=official-stable"
+        ;;
+    *)
+        usage
+        ;;
+esac
